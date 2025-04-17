@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  b2bwebservice:
+    image: b2bwebservice:latest
+    build:
+      context: /b2bwebservice
+      dockerfile: Dockerfile
+    ports:
+      - "16161:16161"
+      - "1616:1616"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    restart: always
+    volumes: 
+      - /root/certificates:/app/certificates
+   
