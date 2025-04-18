@@ -11,7 +11,6 @@
     {
         public int SiteID { get; set; }
         public string Text { get; set; }
-        public string CenterGuid { get; set; }
-        public string ProjectGuid { get; set; }
+        public Guid Platform_ID { get; set; }
     }
 }

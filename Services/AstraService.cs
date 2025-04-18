@@ -120,13 +120,13 @@ namespace B2BWebService.Services
                 {
                     var contractorId = contractor.Contractor_ID;
                     var sql = new StringBuilder();
-                    sql.AppendLine("exec [b2b].[PR_ContractorCenterList_Get] @Contractor_ID=@contractorId");
+                    sql.AppendLine("exec [b2b].[PR_ContractorPlatformList_Get] @Contractor_ID=@contractorId");
 
                     var result = await _context.ContractorSiteList
                                         .FromSqlRaw(sql.ToString(), new SqlParameter("@contractorId", contractorId))
                                         .ToListAsync();
 
-                    var siteList = point.Sites.Where(x => result.Any(y => y.Center_ID.ToString().ToLower() == x.CenterGuid.ToString().ToLower())).ToList();
+                    var siteList = point.Sites.Where(x => result.Any(y => y.Platform_ID.ToString().ToLower() == x.Platform_ID.ToString().ToLower())).ToList();
 
                     var responseSites = siteList.Select(site => new SimpleResponseObj
                     {
@@ -189,22 +189,22 @@ namespace B2BWebService.Services
                                                 .ToListAsync();
 
                 XElement xmlCenters = new XElement(
-                 "CenterNames", sites.Select(site => new XElement("CenterName", site.Text))
+                 "ListPlatform_ID", sites.Select(site => new XElement("Platform_ID", site.Text))
                  );
                 XElement xmlPartCodes = new XElement(
-                    "PartCodes", partCodes.Select(code => new XElement("PartCode", code))
+                    "ListPartCodes", partCodes.Select(code => new XElement("PartsCode", code))
                     );
 
                 var sqlResult = new StringBuilder();
-                sqlResult.AppendLine("exec [b2b].[PR_GetAutoPartsWholeSale] @CenterNames=@p0, @ListPartCodes=@p1, @Contractor_ID=@p2, @BOnlyAvailable=@p3, @BAnalog=@p4");
+                sqlResult.AppendLine("exec [b2b].[PR_GetAutoPartsWholeSale] @ListPlatform_ID=@p0, @ListPartCodes=@p1, @Contractor_ID=@p2, @BOnlyAvailable=@p3, @BAnalog=@p4");
 
                 var result = await _context.PartsInfo
                     .FromSqlRaw(sqlResult.ToString(),
                             new SqlParameter("@p0", xmlCenters.ToString()),
                             new SqlParameter("@p1", xmlPartCodes.ToString()),
                             new SqlParameter("@p2", contractorId),
-                            new SqlParameter("@p3", true),//BOnlyAvailable ?? true),
-                            new SqlParameter("@p4", true)//BAnalog ?? true)
+                            new SqlParameter("@p3", BOnlyAvailable ?? true),
+                            new SqlParameter("@p4", BAnalog ?? true)
                             )
                     .ToListAsync();
 
@@ -218,13 +218,13 @@ namespace B2BWebService.Services
                     var resultByPartCode = result.Where(x => x.RequestPartCode == partCode).ToList();
                     var sitesByPartCode = allSites
                         .Where(x => resultByPartCode
-                                    .Any(r => r.Center_ID.ToString().ToLower() == x.CenterGuid.ToLower())
-                                    || sites.Any(s => s.CenterGuid.ToLower() == x.CenterGuid.ToLower())).ToList();
+                                    .Any(r => r.Platform_ID == x.Platform_ID)
+                                    || sites.Any(s => s.Platform_ID == x.Platform_ID)).ToList();
 
                     List<SiteResult> siteResults = new List<SiteResult>();
-                    foreach (var center in sitesByPartCode)
+                    foreach (var platform in sitesByPartCode)
                     {
-                        var resultByCenter = resultByPartCode.Where(x => x.Center_ID.ToString().ToLower() == center.CenterGuid.ToLower()).ToList();
+                        var resultByCenter = resultByPartCode.Where(x => x.Platform_ID == platform.Platform_ID).ToList();
                         List<ContractDetsDetail> contractDets = new List<ContractDetsDetail>();
                         foreach (var scheme in contractorSchemes)
                         {
@@ -275,7 +275,7 @@ namespace B2BWebService.Services
 
                         siteResults.Add(new SiteResult()
                         {
-                            Point = new PointSiteDto { SiteID = center.SiteID, PointID = 16 },
+                            Point = new PointSiteDto { SiteID = platform.SiteID, PointID = 16 },
                             ContractDets = contractDets
                         });
                     }
@@ -321,9 +321,9 @@ namespace B2BWebService.Services
                                 new SqlParameter("@p3", pricingSchemeID))
                         .ToListAsync();
 
-                    var partsResultAll = searchParts.Where(x => x.Center_ID.ToString().ToLower() == center.CenterGuid.ToLower());
-                    var department = partsResultAll.Select(x => x.Department_ID).FirstOrDefault();
-                    var partsResult = partsResultAll.Where(x => x.Department_ID == department).ToList();
+                    var partsResultAll = searchParts.Where(x => x.Platform_ID.ToString().ToLower() == center.Platform_ID.ToString().ToLower());
+                    var department = partsResultAll.Select(x => x.Platform_ID).FirstOrDefault();
+                    var partsResult = partsResultAll.Where(x => x.Platform_ID == department).ToList();
 
                     XElement xmlOrderParts = new XElement("PartsForOrder",
                     from part in partsResult
@@ -346,9 +346,9 @@ namespace B2BWebService.Services
                     var createdOrder = await _context.CreatedOrderInfo
                         .FromSqlRaw(requestString.ToString(),
                                 new SqlParameter("@p0", pricingSchemeID),
-                                new SqlParameter("@p1", center.CenterGuid),
+                                new SqlParameter("@p1", center.Platform_ID),////****
                                 new SqlParameter("@p2", department),
-                                new SqlParameter("@p3", center.ProjectGuid),
+                                new SqlParameter("@p3", center.Platform_ID),///***
                                 new SqlParameter("@p4", contractorId),
                                 new SqlParameter("@p5", xmlOrderParts.ToString()))
                         .ToListAsync();
@@ -376,7 +376,7 @@ namespace B2BWebService.Services
                 var contractorId = contractor.Contractor_ID.ToString();
 
                 XElement xmlCenters = new XElement(
-                      "Centers", centers.Select(site => new XElement("Center_ID", site.CenterGuid))
+                      "Centers", centers.Select(site => new XElement("Center_ID", site.Platform_ID))
                       );
 
                 var result = await _context.OrderInfo
@@ -417,7 +417,7 @@ namespace B2BWebService.Services
                         }
 
                     }
-                    var site = centers.FirstOrDefault(x => x.CenterGuid.ToLower() == center.ToLower());
+                    var site = centers.FirstOrDefault(x => x.Platform_ID.ToString().ToLower() == center.ToLower());
                     actualOrdersBySiteResponseObjList.Add(new GetActualOrdersBySiteResponseObj()
                     {
                         PointID = 16,
@@ -481,7 +481,7 @@ namespace B2BWebService.Services
                 var contractorId = contractor.Contractor_ID.ToString();
 
                 XElement xmlCenters = new XElement(
-                      "Centers", centers.Select(site => new XElement("Center_ID", site.CenterGuid))
+                      "Centers", centers.Select(site => new XElement("Center_ID", site.Platform_ID))
                       );
 
                 var result = await _context.OrderInfo
@@ -522,7 +522,7 @@ namespace B2BWebService.Services
                         }
 
                     }
-                    var site = centers.FirstOrDefault(x => x.CenterGuid.ToLower() == center.ToLower());
+                    var site = centers.FirstOrDefault(x => x.Platform_ID.ToString().ToLower() == center.ToLower());
                     actualOrdersBySiteResponseObjList.Add(new GetActualOrdersBySiteResponseObj()
                     {
                         PointID = 16,
